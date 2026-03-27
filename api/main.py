@@ -34,13 +34,14 @@ app.add_middleware(
 
 def get_db_connection():
     try:
+        
         return psycopg2.connect(
             user=os.getenv("DB_USER"),
             password=os.getenv("DB_PASSWORD"),
             host=os.getenv("DB_HOST"),
             port=os.getenv("DB_PORT", "5432"),
             database=os.getenv("DB_NAME"),
-            connect_timeout=5
+            connect_timeout=10 
         )
     except Exception:
         return None
@@ -69,7 +70,7 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
     
     conn = get_db_connection()
     if not conn:
-        return {"status": "erro", "recomendacoes": [], "mensagem": "Falha na conexao"}
+        return {"status": "erro", "recomendacoes": [], "mensagem": "Falha na conexao com o banco"}
 
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
