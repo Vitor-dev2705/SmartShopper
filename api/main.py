@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
@@ -14,13 +14,11 @@ if str(current_dir) not in sys.path:
 
 try:
     import scraper
-    atualizar_area_automatica = scraper.atualizar_area_automatica
-except (ImportError, AttributeError):
+except ImportError:
     try:
         from api import scraper
-        atualizar_area_automatica = scraper.atualizar_area_automatica
-    except:
-        def atualizar_area_automatica(lat, lon): pass
+    except ImportError:
+        scraper = None
 
 load_dotenv()
 
@@ -40,7 +38,7 @@ def get_db_connection():
             user=os.getenv("DB_USER"),
             password=os.getenv("DB_PASSWORD"),
             host=os.getenv("DB_HOST"),
-            port=os.getenv("DB_PORT"),
+            port=os.getenv("DB_PORT", "5432"),
             database=os.getenv("DB_NAME"),
             connect_timeout=5
         )
@@ -50,8 +48,8 @@ def get_db_connection():
 @app.get("/")
 async def serve_index():
     paths_to_try = [
-        Path(__file__).resolve().parent.parent / "index.html",
-        Path(__file__).resolve().parent / "index.html",
+        current_dir.parent / "index.html",
+        current_dir / "index.html",
         Path(os.getcwd()) / "index.html"
     ]
     
@@ -59,14 +57,15 @@ async def serve_index():
         if path.exists():
             return FileResponse(str(path))
             
-    return {"erro": "index.html nao encontrado", "tentativas": [str(p) for p in paths_to_try]}
+    return {"erro": "index.html nao encontrado"}
 
 @app.get("/v1/buscar-barato")
 async def buscar_mais_barato(lat: float, lon: float, background_tasks: BackgroundTasks):
-    try:
-        background_tasks.add_task(atualizar_area_automatica, lat, lon)
-    except:
-        pass
+    if scraper and hasattr(scraper, 'atualizar_area_automatica'):
+        try:
+            background_tasks.add_task(scraper.atualizar_area_automatica, lat, lon)
+        except:
+            pass
     
     conn = get_db_connection()
     if not conn:
@@ -84,7 +83,7 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
         FROM mercados
         WHERE ST_DWithin(localizacao, ST_MakePoint(%s, %s)::geography, 15000)
         ORDER BY preco ASC, distancia_km ASC
-        LIMIT 15;
+        LIMIT 20;
         """
         cur.execute(query, (lon, lat, lon, lat))
         mercados = cur.fetchall()
@@ -93,7 +92,7 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
         for m in mercados:
             recomendacoes.append({
                 "nome": str(m['nome']),
-                "preco": float(m['preco']) if m['preco'] else 0.0,
+                "preco": float(m['preco']) if m.get('preco') else 0.0,
                 "distancia_km": round(float(m['distancia_km']), 2),
                 "lat": float(m['lat']),
                 "lon": float(m['lon'])
