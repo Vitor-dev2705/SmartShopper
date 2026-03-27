@@ -1,11 +1,19 @@
 import os
 import psycopg2
+from pathlib import Path
 from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from scraper import atualizar_area_automatica 
+
+try:
+    from api.scraper import atualizar_area_automatica
+except ImportError:
+    try:
+        from scraper import atualizar_area_automatica
+    except ImportError:
+        def atualizar_area_automatica(lat, lon): pass
 
 load_dotenv()
 
@@ -27,16 +35,24 @@ def get_db_connection():
             host=os.getenv("DB_HOST"),
             port=os.getenv("DB_PORT"),
             database=os.getenv("DB_NAME"),
-            connect_timeout=10 
+            connect_timeout=5
         )
-    except Exception as e:
+    except Exception:
         return None
 
 @app.get("/")
 async def serve_index():
-    if os.path.exists('index.html'):
-        return FileResponse('index.html')
-    return {"erro": "index.html nao encontrado"}
+    base_path = Path(__file__).resolve().parent.parent
+    index_path = base_path / "index.html"
+    
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    
+    local_path = Path(os.getcwd()) / "index.html"
+    if local_path.exists():
+        return FileResponse(str(local_path))
+        
+    return {"erro": f"index.html nao encontrado em {index_path}"}
 
 @app.get("/v1/buscar-barato")
 async def buscar_mais_barato(lat: float, lon: float, background_tasks: BackgroundTasks):
@@ -44,7 +60,7 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
     
     conn = get_db_connection()
     if not conn:
-        raise HTTPException(status_code=500, detail="Erro de conexao")
+        raise HTTPException(status_code=500, detail="Erro de conexao com banco")
 
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -57,23 +73,29 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
             ST_X(localizacao::geometry) as lon
         FROM mercados
         WHERE ST_DWithin(localizacao, ST_MakePoint(%s, %s)::geography, 15000)
-        ORDER BY preco_cesta_total ASC, distancia_km ASC
+        ORDER BY preco ASC, distancia_km ASC
         LIMIT 10;
         """
         cur.execute(query, (lon, lat, lon, lat))
         mercados = cur.fetchall()
+        
+        recomendacoes = []
+        for m in mercados:
+            recomendacoes.append({
+                "nome": m['nome'],
+                "preco": float(m['preco']),
+                "distancia_km": round(float(m['distancia_km']), 2),
+                "lat": float(m['lat']),
+                "lon": float(m['lon'])
+            })
+
         cur.close()
         conn.close()
 
         return {
             "status": "sucesso", 
-            "recomendacoes": mercados
+            "recomendacoes": recomendacoes
         }
     except Exception as e:
         if conn: conn.close()
         raise HTTPException(status_code=500, detail=str(e))
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
