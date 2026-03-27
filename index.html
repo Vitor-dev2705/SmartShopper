@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="pt-br">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>SmartShopper</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <title>SmartShopper</title>
+        <link rel="stylesheet"
+            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <style>
         :root { --primary: #007bff; --success: #27ae60; --bg: #f8f9fa; }
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--bg); overflow: hidden; }
         .app-container { display: flex; flex-direction: column; height: 100vh; }
@@ -39,31 +41,36 @@
             text-decoration: none; margin-top: 8px; font-weight: bold;
         }
     </style>
-</head>
-<body>
+    </head>
+    <body>
 
-<div class="loading-overlay" id="loader"><div class="loading-bar" id="bar"></div></div>
+        <div class="loading-overlay" id="loader"><div class="loading-bar"
+                id="bar"></div></div>
 
-<div class="app-container">
-    <div id="map"></div>
-    <div class="sidebar">
-        <h2 style="margin-top:0">Melhores Precos</h2>
-        <div id="ranking">
-            <p style="color:#999; text-align:center">Mova o mapa para buscar...</p>
+        <div class="app-container">
+            <div id="map"></div>
+            <div class="sidebar">
+                <h2 style="margin-top:0">Melhores Precos</h2>
+                <div id="ranking">
+                    <p style="color:#999; text-align:center">Mova o mapa para
+                        buscar...</p>
+                </div>
+            </div>
         </div>
-    </div>
-</div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script>
     var map, markers = L.layerGroup();
 
     function setupMap(lat, lon) {
         map = L.map('map', { zoomControl: false }).setView([lat, lon], 15);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
         markers.addTo(map);
         
         L.circleMarker([lat, lon], { radius: 6, color: '#007bff', fillOpacity: 1 }).addTo(map);
+        
         buscarPrecos(lat, lon);
 
         map.on('moveend', () => {
@@ -96,10 +103,11 @@
                     card.innerHTML = `
                         <div>
                             <strong>${m.nome}</strong><br>
-                            <span class="distance">Distancia: ${m.distancia_km.toFixed(2)}km</span>
+                            <span class="distance">Distância: ${m.distancia_km.toFixed(2)}km</span>
                         </div>
                         <div class="price">R$ ${m.preco.toFixed(2)}</div>
                     `;
+                    
                     card.onclick = () => map.flyTo([m.lat, m.lon], 17);
                     rankingDiv.appendChild(card);
 
@@ -121,14 +129,17 @@
             rankingDiv.innerHTML = '<p style="color:red; text-align:center">Erro ao conectar com o servidor.</p>';
         } finally {
             bar.style.width = '100%';
-            setTimeout(() => loader.style.display = 'none', 500);
+            setTimeout(() => {
+                loader.style.display = 'none';
+                bar.style.width = '0%';
+            }, 500);
         }
     }
 
     navigator.geolocation.getCurrentPosition(
         p => setupMap(p.coords.latitude, p.coords.longitude),
-        () => setupMap(-15.8177, -48.1051)
+        () => setupMap(-15.8177, -48.1051) // Fallback: Brasília
     );
 </script>
-</body>
+    </body>
 </html>
