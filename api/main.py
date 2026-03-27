@@ -44,23 +44,20 @@ def get_db_connection():
 async def serve_index():
     base_path = Path(__file__).resolve().parent.parent
     index_path = base_path / "index.html"
-    
     if index_path.exists():
         return FileResponse(str(index_path))
-    
-    local_path = Path(os.getcwd()) / "index.html"
-    if local_path.exists():
-        return FileResponse(str(local_path))
-        
-    return {"erro": f"index.html nao encontrado em {index_path}"}
+    return {"erro": "index.html nao encontrado"}
 
 @app.get("/v1/buscar-barato")
 async def buscar_mais_barato(lat: float, lon: float, background_tasks: BackgroundTasks):
-    background_tasks.add_task(atualizar_area_automatica, lat, lon)
+    try:
+        background_tasks.add_task(atualizar_area_automatica, lat, lon)
+    except:
+        pass
     
     conn = get_db_connection()
     if not conn:
-        raise HTTPException(status_code=500, detail="Erro de conexao com banco")
+        return {"status": "erro", "recomendacoes": [], "mensagem": "Erro de conexao"}
 
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -82,7 +79,7 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
         recomendacoes = []
         for m in mercados:
             recomendacoes.append({
-                "nome": m['nome'],
+                "nome": str(m['nome']),
                 "preco": float(m['preco']),
                 "distancia_km": round(float(m['distancia_km']), 2),
                 "lat": float(m['lat']),
@@ -98,4 +95,4 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
         }
     except Exception as e:
         if conn: conn.close()
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "erro", "recomendacoes": [], "detalhe": str(e)}
