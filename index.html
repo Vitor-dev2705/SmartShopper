@@ -73,46 +73,56 @@
     }
 
     async function buscarPrecos(lat, lon) {
-        document.getElementById('loader').style.display = 'block';
-        document.getElementById('bar').style.width = '70%';
+        const loader = document.getElementById('loader');
+        const bar = document.getElementById('bar');
+        const rankingDiv = document.getElementById('ranking');
+
+        loader.style.display = 'block';
+        bar.style.width = '70%';
         
         try {
             const res = await fetch(`/v1/buscar-barato?lat=${lat}&lon=${lon}`);
             const data = await res.json();
             
             markers.clearLayers();
-            const rankingDiv = document.getElementById('ranking');
             rankingDiv.innerHTML = '';
 
-            data.recomendacoes.forEach((m) => {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.innerHTML = `
-                    <div>
-                        <strong>${m.nome}</strong><br>
-                        <span class="distance">Distancia: ${m.distancia_km.toFixed(2)}km</span>
-                    </div>
-                    <div class="price">R$ ${m.preco.toFixed(2)}</div>
-                `;
-                card.onclick = () => map.flyTo([m.lat, m.lon], 17);
-                rankingDiv.appendChild(card);
+            if (!data || !data.recomendacoes || data.recomendacoes.length === 0) {
+                rankingDiv.innerHTML = '<p style="color:#999; text-align:center">Nenhum mercado encontrado nesta área.</p>';
+            } else {
+                data.recomendacoes.forEach((m) => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <div>
+                            <strong>${m.nome}</strong><br>
+                            <span class="distance">Distancia: ${m.distancia_km.toFixed(2)}km</span>
+                        </div>
+                        <div class="price">R$ ${m.preco.toFixed(2)}</div>
+                    `;
+                    card.onclick = () => map.flyTo([m.lat, m.lon], 17);
+                    rankingDiv.appendChild(card);
 
-                const popupContent = `
-                    <div style="text-align:center">
-                        <strong>${m.nome}</strong><br>
-                        <b style="color:var(--success)">R$ ${m.preco.toFixed(2)}</b><br>
-                        <a href="https://www.google.com/maps/search/?api=1&query=${m.lat},${m.lon}" target="_blank" class="btn-rota">VER ROTA</a>
-                    </div>
-                `;
+                    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lon}`;
+                    
+                    const popupContent = `
+                        <div style="text-align:center">
+                            <strong>${m.nome}</strong><br>
+                            <b style="color:var(--success)">R$ ${m.preco.toFixed(2)}</b><br>
+                            <a href="${googleMapsUrl}" target="_blank" class="btn-rota">VER ROTA</a>
+                        </div>
+                    `;
 
-                L.marker([m.lat, m.lon]).addTo(markers).bindPopup(popupContent);
-            });
+                    L.marker([m.lat, m.lon]).addTo(markers).bindPopup(popupContent);
+                });
+            }
         } catch (e) {
-            console.error(e);
+            console.error("Erro na busca:", e);
+            rankingDiv.innerHTML = '<p style="color:red; text-align:center">Erro ao conectar com o servidor.</p>';
+        } finally {
+            bar.style.width = '100%';
+            setTimeout(() => loader.style.display = 'none', 500);
         }
-        
-        document.getElementById('bar').style.width = '100%';
-        setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
     }
 
     navigator.geolocation.getCurrentPosition(

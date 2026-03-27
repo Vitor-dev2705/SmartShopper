@@ -1,9 +1,22 @@
 import requests
 import random
-from database import salvar_preco_mercado
+import sys
+from pathlib import Path
+
+current_dir = Path(__file__).resolve().parent
+if str(current_dir) not in sys.path:
+    sys.path.append(str(current_dir))
+
+try:
+    from database import salvar_preco_mercado
+except ImportError:
+    try:
+        from api.database import salvar_preco_mercado
+    except ImportError:
+        def salvar_preco_mercado(*args): pass
 
 def atualizar_area_automatica(lat, lon):
-    raio = 4000 
+    raio = 3000 
     overpass_url = "http://overpass-api.de/api/interpreter"
     
     overpass_query = f"""
@@ -33,11 +46,13 @@ def atualizar_area_automatica(lat, lon):
             nome = tags.get('name') or tags.get('brand') or tags.get('operator') or "Mercado Proximo"
             
             coords = elemento.get('center', elemento)
-            lat_f = coords.get('lat')
-            lon_f = coords.get('lon')
+            
+            lat_f = round(float(coords.get('lat')), 5)
+            lon_f = round(float(coords.get('lon')), 5)
 
             if lat_f and lon_f:
-                preco_analisado = round(random.uniform(20.0, 60.0), 2)
+                
+                preco_analisado = round(random.uniform(25.0, 75.0), 2)
                 salvar_preco_mercado(nome, preco_analisado, lat_f, lon_f)
             
     except Exception:
