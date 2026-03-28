@@ -88,8 +88,9 @@
                 markers.clearLayers();
                 rankingDiv.innerHTML = '';
 
-                if (!data || !data.recomendacoes || data.recomendacoes.length === 0) {
-                    rankingDiv.innerHTML = '<p style="color:#999; text-align:center">Nenhum mercado encontrado nesta área.</p>';
+                if (!data || data.status === "erro" || !data.recomendacoes || data.recomendacoes.length === 0) {
+                    const msg = data.mensagem || "Nenhum mercado encontrado nesta área.";
+                    rankingDiv.innerHTML = `<p style="color:#999; text-align:center">${msg}</p>`;
                 } else {
                     data.recomendacoes.forEach((m) => {
                         const card = document.createElement('div');
