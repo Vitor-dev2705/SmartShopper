@@ -80,16 +80,20 @@
 
             loader.style.display = 'block';
             bar.style.width = '70%';
+
+            const baseUrl = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
+                ? "http://127.0.0.1:8000" 
+                : "";
             
             try {
-                const res = await fetch(`/v1/buscar-barato?lat=${lat}&lon=${lon}`);
+                const res = await fetch(`${baseUrl}/v1/buscar-barato?lat=${lat}&lon=${lon}`);
                 const data = await res.json();
                 
                 markers.clearLayers();
                 rankingDiv.innerHTML = '';
 
                 if (!data || data.status === "erro" || !data.recomendacoes || data.recomendacoes.length === 0) {
-                    const msg = data.mensagem || "Nenhum mercado encontrado nesta área.";
+                    const msg = data.mensagem || "Nenhum mercado encontrado.";
                     rankingDiv.innerHTML = `<p style="color:#999; text-align:center">${msg}</p>`;
                 } else {
                     data.recomendacoes.forEach((m) => {
@@ -98,7 +102,7 @@
                         card.innerHTML = `
                             <div>
                                 <strong>${m.nome}</strong><br>
-                                <span class="distance">Distância: ${m.distancia_km.toFixed(2)}km</span>
+                                <span class="distance">${m.distancia_km.toFixed(2)}km</span>
                             </div>
                             <div class="price">R$ ${m.preco.toFixed(2)}</div>
                         `;
@@ -120,8 +124,8 @@
                     });
                 }
             } catch (e) {
-                console.error("Erro na busca:", e);
-                rankingDiv.innerHTML = '<p style="color:red; text-align:center">Erro ao conectar com o servidor.</p>';
+                console.error(e);
+                rankingDiv.innerHTML = '<p style="color:red; text-align:center">Erro ao conectar.</p>';
             } finally {
                 bar.style.width = '100%';
                 setTimeout(() => {
