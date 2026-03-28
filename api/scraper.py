@@ -1,59 +1,58 @@
+import os
 import requests
-import random
-import sys
+import psycopg2
 from pathlib import Path
+from dotenv import load_dotenv
 
-current_dir = Path(__file__).resolve().parent
-if str(current_dir) not in sys.path:
-    sys.path.append(str(current_dir))
+load_dotenv()
 
-try:
-    from database import salvar_preco_mercado
-except ImportError:
+def get_db_connection():
     try:
-        from api.database import salvar_preco_mercado
-    except ImportError:
-        def salvar_preco_mercado(*args): pass
+        return psycopg2.connect(
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            host=os.getenv("DB_HOST"),
+            port=os.getenv("DB_PORT", "5432"),
+            database=os.getenv("DB_NAME")
+        )
+    except Exception:
+        return None
 
 def atualizar_area_automatica(lat, lon):
-    raio = 3000 
     overpass_url = "http://overpass-api.de/api/interpreter"
-    
     overpass_query = f"""
-    [out:json][timeout:10];
+    [out:json];
     (
-      nwr["shop"~"supermarket|convenience|grocery|wholesale|market"](around:{raio},{lat},{lon});
-      nwr["amenity"~"market"](around:{raio},{lat},{lon});
+      node["shop"="supermarket"](around:5000, {lat}, {lon});
+      way["shop"="supermarket"](around:5000, {lat}, {lon});
     );
     out center;
     """
     
     try:
-        response = requests.get(overpass_url, params={'data': overpass_query}, timeout=8)
+        response = requests.get(overpass_url, params={'data': overpass_query}, timeout=30)
+        data = response.json()
         
-        if response.status_code != 200:
+        conn = get_db_connection()
+        if not conn:
             return
-
-        dados = response.json()
-        elementos = dados.get('elements', [])
+            
+        cur = conn.cursor()
         
-        if not elementos:
-            return
-
-        for elemento in elementos:
-            tags = elemento.get('tags', {})
+        for element in data.get('elements', []):
+            nome = element.get('tags', {}).get('name', 'Supermercado Sem Nome')
+            e_lat = element.get('lat') or element.get('center', {}).get('lat')
+            e_lon = element.get('lon') or element.get('center', {}).get('lon')
             
-            nome = tags.get('name') or tags.get('brand') or tags.get('operator') or "Mercado Proximo"
-            
-            coords = elemento.get('center', elemento)
-            
-            lat_f = round(float(coords.get('lat')), 5)
-            lon_f = round(float(coords.get('lon')), 5)
-
-            if lat_f and lon_f:
-                
-                preco_analisado = round(random.uniform(25.0, 75.0), 2)
-                salvar_preco_mercado(nome, preco_analisado, lat_f, lon_f)
-            
+            if e_lat and e_lon:
+                cur.execute("""
+                    INSERT INTO mercados (nome, localizacao, preco_cesta_total, ultima_atualizacao)
+                    VALUES (%s, ST_MakePoint(%s, %s)::geography, %s, CURRENT_TIMESTAMP)
+                    ON CONFLICT DO NOTHING;
+                """, (nome, e_lon, e_lat, 0.0))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
     except Exception:
         pass

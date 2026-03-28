@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 current_dir = Path(__file__).resolve().parent
+root_dir = current_dir.parent
+
 if str(current_dir) not in sys.path:
     sys.path.append(str(current_dir))
 
@@ -16,7 +18,7 @@ try:
     import scraper
 except ImportError:
     try:
-        from api import scraper
+        from . import scraper
     except ImportError:
         scraper = None
 
@@ -33,13 +35,21 @@ app.add_middleware(
 )
 
 def get_db_connection():
+    db_user = os.getenv("DB_USER")
+    db_pass = os.getenv("DB_PASSWORD")
+    db_host = os.getenv("DB_HOST")
+    db_name = os.getenv("DB_NAME")
+    
+    if not all([db_user, db_pass, db_host, db_name]):
+        return None
+
     try:
         return psycopg2.connect(
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
-            host=os.getenv("DB_HOST"),
+            user=db_user,
+            password=db_pass,
+            host=db_host,
             port=os.getenv("DB_PORT", "5432"),
-            database=os.getenv("DB_NAME"),
+            database=db_name,
             connect_timeout=10
         )
     except Exception:
@@ -48,8 +58,9 @@ def get_db_connection():
 @app.get("/")
 async def serve_index():
     paths_to_try = [
-        current_dir.parent / "index.html",
+        root_dir / "index.html",
         current_dir / "index.html",
+        Path("/var/task/index.html"),
         Path(os.getcwd()) / "index.html"
     ]
     
@@ -57,7 +68,7 @@ async def serve_index():
         if path.exists():
             return FileResponse(str(path))
             
-    return {"erro": "index.html nao encontrado"}
+    return {"status": "erro", "mensagem": "index.html nao encontrado"}
 
 @app.get("/v1/buscar-barato")
 async def buscar_mais_barato(lat: float, lon: float, background_tasks: BackgroundTasks):
@@ -69,7 +80,7 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
     
     conn = get_db_connection()
     if not conn:
-        return {"status": "erro", "recomendacoes": [], "mensagem": "Falha na conexao com o banco"}
+        return {"status": "erro", "recomendacoes": [], "mensagem": "Falha na conexao"}
 
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -110,7 +121,6 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
         if conn: conn.close()
         return {"status": "erro", "recomendacoes": [], "detalhe": str(e)}
 
-
 @app.get("/debug-db")
 async def debug_db():
     try:
@@ -118,6 +128,13 @@ async def debug_db():
         if conn:
             conn.close()
             return {"status": "Conexão com banco OK"}
-        return {"status": "Erro", "detalhe": "Não foi possível conectar"}
+        
+        vars_check = {
+            "USER": bool(os.getenv("DB_USER")),
+            "PASS": bool(os.getenv("DB_PASSWORD")),
+            "HOST": bool(os.getenv("DB_HOST")),
+            "NAME": bool(os.getenv("DB_NAME"))
+        }
+        return {"status": "Erro", "variaveis": vars_check}
     except Exception as e:
         return {"status": "Erro fatal", "detalhe": str(e)}
