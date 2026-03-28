@@ -55,8 +55,8 @@ def get_db_connection():
             sslmode='require',
             options="-c statement_timeout=30000"
         )
-    except Exception:
-        return None
+    except Exception as e:
+        raise e
     
 @app.get("/")
 async def serve_index():
@@ -81,11 +81,8 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
         except:
             pass
     
-    conn = get_db_connection()
-    if not conn:
-        return {"status": "erro", "recomendacoes": [], "mensagem": "Falha na conexao"}
-
     try:
+        conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
         query = """
@@ -116,13 +113,9 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
         cur.close()
         conn.close()
 
-        return {
-            "status": "sucesso", 
-            "recomendacoes": recomendacoes
-        }
+        return {"status": "sucesso", "recomendacoes": recomendacoes}
     except Exception as e:
-        if 'conn' in locals() and conn: conn.close()
-        return {"status": "erro", "recomendacoes": [], "detalhe": str(e)}
+        return {"status": "erro", "mensagem": str(e)}
 
 @app.get("/debug-db")
 async def debug_db():
@@ -131,14 +124,10 @@ async def debug_db():
         if conn:
             conn.close()
             return {"status": "Conexão com banco OK"}
-        
-        vars_check = {
-            "USER": bool(os.getenv("DB_USER")),
-            "PASS": bool(os.getenv("DB_PASSWORD")),
-            "HOST": bool(os.getenv("DB_HOST")),
-            "NAME": bool(os.getenv("DB_NAME")),
-            "PORT": os.getenv("DB_PORT", "6543")
-        }
-        return {"status": "Erro", "mensagem": "Falha ao obter objeto de conexão", "variaveis": vars_check}
     except Exception as err:
-        return {"status": "Erro fatal", "detalhe": str(err)}
+        return {
+            "status": "Erro de Conexão",
+            "detalhe_tecnico": str(err),
+            "host_usado": os.getenv("DB_HOST"),
+            "user_usado": os.getenv("DB_USER")
+        }
