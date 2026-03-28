@@ -54,7 +54,7 @@ def get_db_connection():
         )
     except Exception:
         return None
-
+    
 @app.get("/")
 async def serve_index():
     paths_to_try = [
