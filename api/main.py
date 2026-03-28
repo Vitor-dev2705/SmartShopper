@@ -138,6 +138,6 @@ async def debug_db():
             "NAME": bool(os.getenv("DB_NAME")),
             "PORT": os.getenv("DB_PORT", "6543")
         }
-        return {"status": "Erro", "detalhe": str(e), "variaveis": vars_check}
-    except Exception as e:
-        return {"status": "Erro fatal", "detalhe": str(e)}
+        return {"status": "Erro", "mensagem": "Falha ao obter objeto de conexão", "variaveis": vars_check}
+    except Exception as err:
+        return {"status": "Erro fatal", "detalhe": str(err)}
