@@ -39,6 +39,7 @@ def get_db_connection():
     db_pass = os.getenv("DB_PASSWORD")
     db_host = os.getenv("DB_HOST")
     db_name = os.getenv("DB_NAME")
+    db_port = os.getenv("DB_PORT", "6543")
     
     if not all([db_user, db_pass, db_host, db_name]):
         return None
@@ -48,9 +49,10 @@ def get_db_connection():
             user=db_user,
             password=db_pass,
             host=db_host,
-            port=os.getenv("DB_PORT", "5432"),
+            port=db_port,
             database=db_name,
-            connect_timeout=10
+            connect_timeout=10,
+            sslmode='require'
         )
     except Exception:
         return None
@@ -93,7 +95,7 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
             ST_Y(localizacao::geometry) as lat,
             ST_X(localizacao::geometry) as lon
         FROM mercados
-        WHERE ST_DWithin(localizacao, ST_MakePoint(%s, %s)::geography, 15000)
+        WHERE ST_DWithin(localizacao, ST_MakePoint(%s, %s)::geography, 25000)
         ORDER BY preco ASC, distancia_km ASC
         LIMIT 20;
         """
@@ -118,7 +120,7 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
             "recomendacoes": recomendacoes
         }
     except Exception as e:
-        if conn: conn.close()
+        if 'conn' in locals() and conn: conn.close()
         return {"status": "erro", "recomendacoes": [], "detalhe": str(e)}
 
 @app.get("/debug-db")
@@ -133,7 +135,8 @@ async def debug_db():
             "USER": bool(os.getenv("DB_USER")),
             "PASS": bool(os.getenv("DB_PASSWORD")),
             "HOST": bool(os.getenv("DB_HOST")),
-            "NAME": bool(os.getenv("DB_NAME"))
+            "NAME": bool(os.getenv("DB_NAME")),
+            "PORT": os.getenv("DB_PORT", "6543")
         }
         return {"status": "Erro", "variaveis": vars_check}
     except Exception as e:
