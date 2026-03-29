@@ -39,7 +39,8 @@ def get_db_connection():
     db_pass = (os.getenv("POSTGRES_PASSWORD") or os.getenv("DB_PASSWORD", "")).strip()
     db_host = (os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST", "")).strip()
     db_name = (os.getenv("POSTGRES_DATABASE") or os.getenv("DB_NAME", "postgres")).strip()
-    db_port = (os.getenv("DB_PORT") or "6543").strip()
+    db_port = "5432"
+
     if not all([db_user, db_pass, db_host]):
         return None
 
@@ -51,21 +52,10 @@ def get_db_connection():
             port=db_port,
             database=db_name,
             sslmode='require',
-            connect_timeout=10
+            connect_timeout=20
         )
     except Exception as e:
-        try:
-            return psycopg2.connect(
-                user=db_user,
-                password=db_pass,
-                host=db_host,
-                port="5432",
-                database=db_name,
-                sslmode='require',
-                connect_timeout=10
-            )
-        except:
-            raise e
+        raise e
     
 @app.get("/")
 async def serve_index():
