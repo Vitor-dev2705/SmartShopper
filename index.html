@@ -99,23 +99,26 @@
                     data.recomendacoes.forEach((m) => {
                         const card = document.createElement('div');
                         card.className = 'card';
+                        const precoFormatado = m.preco ? m.preco.toFixed(2) : "0.00";
+                        const distFormatada = m.distancia_km ? m.distancia_km.toFixed(2) : "0.00";
+
                         card.innerHTML = `
                             <div>
                                 <strong>${m.nome}</strong><br>
-                                <span class="distance">${m.distancia_km.toFixed(2)}km</span>
+                                <span class="distance">${distFormatada}km</span>
                             </div>
-                            <div class="price">R$ ${m.preco.toFixed(2)}</div>
+                            <div class="price">R$ ${precoFormatado}</div>
                         `;
                         
                         card.onclick = () => map.flyTo([m.lat, m.lon], 17);
                         rankingDiv.appendChild(card);
 
-                        const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lon}`;
+                        const googleMapsUrl = `https://www.google.com/maps?q=${m.lat},${m.lon}`;
                         
                         const popupContent = `
                             <div style="text-align:center">
                                 <strong>${m.nome}</strong><br>
-                                <b style="color:var(--success)">R$ ${m.preco.toFixed(2)}</b><br>
+                                <b style="color:var(--success)">R$ ${precoFormatado}</b><br>
                                 <a href="${googleMapsUrl}" target="_blank" class="btn-rota">VER ROTA</a>
                             </div>
                         `;
