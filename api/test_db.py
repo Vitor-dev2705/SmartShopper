@@ -7,13 +7,21 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def get_db_connection():
+    db_user = os.getenv("DB_USER", "").strip()
+    db_pass = os.getenv("DB_PASSWORD", "").strip()
+    db_host = os.getenv("DB_HOST", "").strip()
+    db_name = os.getenv("DB_NAME", "postgres").strip()
+    db_port = os.getenv("DB_PORT", "6543").strip()
+
     try:
         return psycopg2.connect(
-            user=os.getenv("DB_USER").strip(),
-            password=os.getenv("DB_PASSWORD").strip(),
-            host=os.getenv("DB_HOST").strip(),
-            port=os.getenv("DB_PORT", "6543").strip(),
-            database=os.getenv("DB_NAME").strip()
+            user=db_user,
+            password=db_pass,
+            host=db_host,
+            port=db_port,
+            database=db_name,
+            sslmode='require',
+            connect_timeout=10
         )
     except Exception:
         return None

@@ -35,11 +35,11 @@ app.add_middleware(
 )
 
 def get_db_connection():
-    db_user = os.getenv("DB_USER")
-    db_pass = os.getenv("DB_PASSWORD")
-    db_host = os.getenv("DB_HOST")
-    db_name = os.getenv("DB_NAME")
-    db_port = os.getenv("DB_PORT", "6543")
+    db_user = os.getenv("DB_USER").strip()
+    db_pass = os.getenv("DB_PASSWORD").strip()
+    db_host = os.getenv("DB_HOST").strip()
+    db_name = os.getenv("DB_NAME").strip()
+    db_port = os.getenv("DB_PORT", "6543").strip()
     
     if not all([db_user, db_pass, db_host, db_name]):
         return None
@@ -52,8 +52,7 @@ def get_db_connection():
             port=db_port,
             database=db_name,
             connect_timeout=10,
-            sslmode='require',
-            options="-c statement_timeout=30000"
+            sslmode='require'
         )
     except Exception as e:
         raise e
