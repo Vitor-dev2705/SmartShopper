@@ -56,7 +56,7 @@ def get_db_connection():
         )
     except Exception as e:
         raise e
-    
+
 @app.get("/")
 async def serve_index():
     paths_to_try = [
@@ -65,11 +65,9 @@ async def serve_index():
         Path("/var/task/index.html"),
         Path(os.getcwd()) / "index.html"
     ]
-    
     for path in paths_to_try:
         if path.exists():
             return FileResponse(str(path))
-            
     return {"status": "erro", "mensagem": "index.html nao encontrado"}
 
 @app.get("/v1/buscar-barato")
@@ -79,11 +77,9 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
             background_tasks.add_task(scraper.atualizar_area_automatica, lat, lon)
         except:
             pass
-    
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        
         query = """
         SELECT 
             nome, 
@@ -98,7 +94,6 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
         """
         cur.execute(query, (lon, lat, lon, lat))
         mercados = cur.fetchall()
-        
         recomendacoes = []
         for m in mercados:
             recomendacoes.append({
@@ -108,10 +103,8 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
                 "lat": float(m['lat']),
                 "lon": float(m['lon'])
             })
-
         cur.close()
         conn.close()
-
         return {"status": "sucesso", "recomendacoes": recomendacoes}
     except Exception as e:
         return {"status": "erro", "mensagem": str(e)}
@@ -127,6 +120,6 @@ async def debug_db():
         return {
             "status": "Erro de Conexão",
             "detalhe_tecnico": str(err),
-            "host_usado": os.getenv("DB_HOST"),
-            "user_usado": os.getenv("DB_USER")
+            "host_usado": os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST"),
+            "user_usado": os.getenv("POSTGRES_USER") or os.getenv("DB_USER")
         }
