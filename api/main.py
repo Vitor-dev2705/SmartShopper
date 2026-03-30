@@ -1,6 +1,7 @@
 import os
 import psycopg2
 import sys
+import socket
 from pathlib import Path
 from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
@@ -8,12 +9,14 @@ from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
+# Diretórios base
 current_dir = Path(__file__).resolve().parent
 root_dir = current_dir.parent
 
 if str(current_dir) not in sys.path:
     sys.path.append(str(current_dir))
 
+# Importa scraper se existir
 try:
     import scraper
 except ImportError:
@@ -22,10 +25,13 @@ except ImportError:
     except ImportError:
         scraper = None
 
+# Carrega variáveis do .env
 load_dotenv()
 
+# Inicializa FastAPI
 app = FastAPI(title="SmartShopper API")
 
+# Middleware CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,6 +41,7 @@ app.add_middleware(
 )
 
 def get_db_connection():
+    """Cria conexão com o banco Supabase/Postgres"""
     db_user = (os.getenv("POSTGRES_USER") or os.getenv("DB_USER", "")).strip()
     db_pass = (os.getenv("POSTGRES_PASSWORD") or os.getenv("DB_PASSWORD", "")).strip()
     db_host = (os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST", "")).strip()
@@ -42,23 +49,43 @@ def get_db_connection():
     db_port = "5432"
 
     if not all([db_user, db_pass, db_host]):
+        print("⚠️ Variáveis de ambiente incompletas.")
         return None
 
     try:
-        return psycopg2.connect(
+        # Força resolução para IPv4
+        ipv4_host = socket.gethostbyname(db_host)
+        conn = psycopg2.connect(
             user=db_user,
             password=db_pass,
-            host=db_host,
+            host=ipv4_host,
             port=db_port,
             database=db_name,
             sslmode='require',
             connect_timeout=20
         )
+        return conn
     except Exception as e:
-        raise e
+        print(f"❌ Erro de conexão com IPv4: {e}")
+        # Fallback: tenta com o host original
+        try:
+            conn = psycopg2.connect(
+                user=db_user,
+                password=db_pass,
+                host=db_host,
+                port=db_port,
+                database=db_name,
+                sslmode='require',
+                connect_timeout=20
+            )
+            return conn
+        except Exception as err_final:
+            print(f"❌ Erro crítico de conexão: {err_final}")
+            return None
 
 @app.get("/")
 async def serve_index():
+    """Serve index.html se existir"""
     paths_to_try = [
         root_dir / "index.html",
         current_dir / "index.html",
@@ -72,13 +99,18 @@ async def serve_index():
 
 @app.get("/v1/buscar-barato")
 async def buscar_mais_barato(lat: float, lon: float, background_tasks: BackgroundTasks):
+    """Busca mercados mais baratos próximos"""
     if scraper and hasattr(scraper, 'atualizar_area_automatica'):
         try:
             background_tasks.add_task(scraper.atualizar_area_automatica, lat, lon)
-        except:
-            pass
+        except Exception as e:
+            print(f"Erro ao agendar scraper: {e}")
+
     try:
         conn = get_db_connection()
+        if not conn:
+            return {"status": "erro", "mensagem": "Falha ao conectar ao banco (credenciais ausentes)"}
+
         cur = conn.cursor(cursor_factory=RealDictCursor)
         query = """
         SELECT 
@@ -94,6 +126,7 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
         """
         cur.execute(query, (lon, lat, lon, lat))
         mercados = cur.fetchall()
+
         recomendacoes = []
         for m in mercados:
             recomendacoes.append({
@@ -103,6 +136,7 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
                 "lat": float(m['lat']),
                 "lon": float(m['lon'])
             })
+
         cur.close()
         conn.close()
         return {"status": "sucesso", "recomendacoes": recomendacoes}
@@ -111,15 +145,21 @@ async def buscar_mais_barato(lat: float, lon: float, background_tasks: Backgroun
 
 @app.get("/debug-db")
 async def debug_db():
+    """Testa conexão com banco"""
     try:
         conn = get_db_connection()
         if conn:
             conn.close()
             return {"status": "Conexão com banco OK"}
+        else:
+            return {
+                "status": "Erro: Variáveis não encontradas",
+                "host_lido": os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST"),
+                "user_lido": os.getenv("POSTGRES_USER") or os.getenv("DB_USER")
+            }
     except Exception as err:
         return {
             "status": "Erro de Conexão",
             "detalhe_tecnico": str(err),
-            "host_usado": os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST"),
-            "user_usado": os.getenv("POSTGRES_USER") or os.getenv("DB_USER")
+            "ipv4_tentado": socket.gethostbyname(os.getenv("POSTGRES_HOST", "")) if os.getenv("POSTGRES_HOST") else "N/A"
         }
