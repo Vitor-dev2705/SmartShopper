@@ -6,16 +6,25 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def get_db_connection():
+    db_user = (os.getenv("POSTGRES_USER") or os.getenv("DB_USER", "")).strip()
+    db_pass = (os.getenv("POSTGRES_PASSWORD") or os.getenv("DB_PASSWORD", "")).strip()
+    db_host = (os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST", "")).strip()
+    db_name = (os.getenv("POSTGRES_DATABASE") or os.getenv("DB_NAME", "postgres")).strip()
+    db_port = "5432"
+
+    if not all([db_user, db_pass, db_host]):
+        return None
+
     try:
-        conn = psycopg2.connect(
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
-            host=os.getenv("DB_HOST"),
-            port=os.getenv("DB_PORT", "5432"),
-            database=os.getenv("DB_NAME"),
-            connect_timeout=10
+        return psycopg2.connect(
+            user=db_user,
+            password=db_pass,
+            host=db_host,
+            port=db_port,
+            database=db_name,
+            sslmode='require',
+            connect_timeout=20
         )
-        return conn
     except Exception:
         return None
 
